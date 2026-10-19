@@ -249,6 +249,75 @@ def fig_funded(sim, best_row, unc_row, muni_row):
     save(fig, "07_funded_status.png")
 
 
+def fig_expected_return(sim, row):
+    """Expected return per year after expected default losses, for one allocation."""
+    keys = (row.govt_sleeve, "MUNI", row.corp_sleeve)
+    w = np.array([row.govt, row.muni, row.corp])
+    names = {row.govt_sleeve: f"{row.govt_sleeve.replace('UST', '')}y Treasury", "MUNI": "Municipal",
+             row.corp_sleeve: mc.SLEEVES[row.corp_sleeve]["name"].split(" (")[0]}
+    yld = np.array([mc.sleeve_yield0(k, sim["y0"]) for k in keys])
+    loss_y = np.array([[0.0 if k.startswith("UST") else sim["loss"][k][:, y].mean() for k in keys]
+                       for y in range(mc.YEARS)])                 # (years, sleeves)
+    port_loss_y = loss_y @ w
+    gross = yld @ w
+    net_y = gross - port_loss_y
+    R = sim["R"]
+    rA = sum(wi * R[k] for wi, k in zip(w, keys)).reshape(-1, mc.YEARS, 12)
+    ann = np.prod(1 + rA, axis=2) - 1                             # (N, years) simulated total return
+    years = np.arange(2027, 2027 + mc.YEARS)
+
+    fig, ax = plt.subplots(1, 2, figsize=(15, 5), gridspec_kw={"width_ratios": [1, 1.25]})
+
+    # left: waterfall from sleeve yields to net expected return (5-year average)
+    steps = [(f"{names[k]}\n{wi:.0%} × {y * 100:.2f}%", wi * y) for k, wi, y in zip(keys, w, yld) if wi > 0]
+    labels = [s[0] for s in steps] + ["Portfolio yield", "Expected default\nloss (5y avg)", "Expected return\nafter defaults"]
+    avg_loss = port_loss_y.mean()
+    bottoms, heights, colors = [], [], []
+    run = 0.0
+    for _, v in steps:
+        bottoms.append(run); heights.append(v); colors.append(BLUE_RAMP[2]); run += v
+    bottoms += [0, gross - avg_loss, 0]
+    heights += [gross, avg_loss, gross - avg_loss]
+    colors += [BLUE_RAMP[4], RED, BLUE_RAMP[6]]
+    x = np.arange(len(labels))
+    ax[0].bar(x, np.array(heights) * 100, bottom=np.array(bottoms) * 100, color=colors, width=0.62)
+    for i, (b, h) in enumerate(zip(bottoms, heights)):
+        txt = f"−{h * 100:.3f}%" if labels[i].startswith("Expected default") else f"{h * 100:.2f}%"
+        ax[0].annotate(txt, (i, (b + h) * 100), textcoords="offset points", xytext=(0, 4), ha="center",
+                       fontsize=9, color=INK, fontweight="bold" if i == len(labels) - 1 else "normal")
+    ax[0].set_xticks(x, labels, fontsize=8)
+    ax[0].set_ylim(0, gross * 100 * 1.15)
+    ax[0].grid(axis="x", visible=False)
+    ax[0].set(title="From yield to expected return after default losses", ylabel="% per year")
+
+    # right: by year
+    ax[1].bar(years, net_y * 100, color=BLUE, width=0.55, label="Yield − expected default loss")
+    for yr, v, l in zip(years, net_y, port_loss_y):
+        ax[1].annotate(f"{v * 100:.2f}%\n(loss {l * 1e4:.1f} bp)", (yr, v * 100), textcoords="offset points",
+                       xytext=(0, -34), ha="center", fontsize=8, color=SURFACE)
+    mean_ann = ann.mean(axis=0) * 100
+    p5, p95 = np.percentile(ann, [5, 95], axis=0) * 100
+    ax[1].errorbar(years + 0.33, mean_ann, yerr=[mean_ann - p5, p95 - mean_ann], fmt="o", color=ORANGE,
+                   ecolor=MUTED, elinewidth=1.2, capsize=3, ms=7, label="Simulated total return: mean, 5th-95th pct")
+    for yr, v in zip(years, mean_ann):
+        ax[1].annotate(f"{v:.2f}%", (yr + 0.33, v), textcoords="offset points", xytext=(8, 0), va="center",
+                       fontsize=8, color=INK2)
+    ax[1].axhline(0, color=INK2, lw=0.8)
+    ax[1].set_xticks(years)
+    ax[1].grid(axis="x", visible=False)
+    ax[1].set(title="Expected return per year, 2027-2031", ylabel="% per year")
+    ax[1].set_ylim(min(p5.min() * 1.4, -1), p95.max() * 1.25)
+    ax[1].legend(loc="upper left", fontsize=8, ncol=2)
+    for a_ in ax:
+        a_.set_axisbelow(True)
+    fig.suptitle(f"Best feasible portfolio: {row.govt:.0%} {names[row.govt_sleeve]} / {row.muni:.0%} muni / "
+                 f"{row.corp:.0%} {names[row.corp_sleeve]}", x=0.01, ha="left", fontsize=10, color=INK2)
+    save(fig, "08_expected_return_after_defaults.png")
+    return pd.DataFrame({"year": years, "portfolio_yield": gross, "expected_default_loss": port_loss_y,
+                         "expected_return_after_defaults": net_y, "sim_total_return_mean": ann.mean(axis=0),
+                         "sim_total_return_p5": p5 / 100, "sim_total_return_p95": p95 / 100})
+
+
 def main():
     os.makedirs(FIG_DIR, exist_ok=True)
     r = mc.main()
@@ -268,6 +337,9 @@ def main():
     fig_variants(coarse)
     muni = coarse[coarse.feasible & (coarse.muni >= 0.5)].sort_values("surplus_sharpe").iloc[-1]
     fig_funded(sim, best, unc, muni)
+    er = fig_expected_return(sim, best)
+    er.to_csv(os.path.join(mc.OUT_DIR, "expected_return_after_defaults.csv"), index=False)
+    print(er.round(5).to_string(index=False))
     summary = pd.DataFrame([best, unc, muni], index=["best_feasible", "best_unconstrained", "best_muni_heavy"])
     summary.to_csv(os.path.join(mc.OUT_DIR, "headline_portfolios.csv"))
     print(summary.T)

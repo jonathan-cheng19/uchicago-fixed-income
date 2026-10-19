@@ -77,6 +77,13 @@ wrote 04_sharpe_heatmap.png
 wrote 05_surplus_frontier.png
 wrote 06_sleeve_choices.png
 wrote 07_funded_status.png
+wrote 08_expected_return_after_defaults.png
+ year  portfolio_yield  expected_default_loss  expected_return_after_defaults  sim_total_return_mean  sim_total_return_p5  sim_total_return_p95
+ 2027          0.05761                0.00026                         0.05735                0.05242             -0.00305               0.10803
+ 2028          0.05761                0.00033                         0.05728                0.05762             -0.00506               0.12968
+ 2029          0.05761                0.00035                         0.05726                0.05944             -0.00501               0.13661
+ 2030          0.05761                0.00040                         0.05721                0.05967             -0.01129               0.13943
+ 2031          0.05761                0.00043                         0.05717                0.06129             -0.00953               0.14426
                      best_feasible best_unconstrained best_muni_heavy
 govt                          0.13                0.6             0.1
 muni                           0.0                0.0             0.5

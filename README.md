@@ -28,6 +28,27 @@ This folder holds a Monte Carlo model of a $100M city pension bond portfolio. It
 | Expected default loss | 0.035% per year (3.5 bp) |
 | Modified duration | 5.99 years (at the 6-year limit) |
 
+### Expected return per year after expected default losses (competition task 3)
+
+Expected return after defaults = portfolio yield today − expected share of principal lost to defaults that year. The portfolio yield of **5.76%** comes from 13% × 4.74% (2y Treasury) plus 87% × 5.91% (IG corporate).
+
+| Year | Portfolio yield | Expected default loss | **Expected return after defaults** | Simulated total return: mean (5th to 95th pct) |
+|---|---|---|---|---|
+| 2027 | 5.76% | 2.6 bp | **5.73%** | 5.24% (−0.3% to 10.8%) |
+| 2028 | 5.76% | 3.3 bp | **5.73%** | 5.76% (−0.5% to 13.0%) |
+| 2029 | 5.76% | 3.5 bp | **5.73%** | 5.94% (−0.5% to 13.7%) |
+| 2030 | 5.76% | 4.0 bp | **5.72%** | 5.97% (−1.1% to 13.9%) |
+| 2031 | 5.76% | 4.3 bp | **5.72%** | 6.13% (−1.0% to 14.4%) |
+
+- **Default losses barely move the result.** They cut only 3-4 bp a year from the return, because 87% of the portfolio is investment grade (A/Baa).
+- **Losses rise each year** as the chance of a credit-stress year climbs from 17% to 39%.
+- **The simulated total return differs from yield minus losses.** It also includes price changes from rate and spread moves.
+  - 2027 comes in below yield. Stress is less likely than average that year, and because the model carries no net rate view (the drift is demeaned across paths), yields tend to drift up, costing some price.
+  - Later years come in above yield. Stress years, when the Fed cuts and bonds rally, become more likely.
+- **The 5-95% range is wide**, roughly −1% to +14%. That is rate risk from a 6-year duration, not credit risk.
+
+![expected return](output/figures/08_expected_return_after_defaults.png)
+
 ### What the results say
 
 1. **The duration rule is the binding constraint.** The liabilities have an effective duration of **11.1 years**, but the rules cap assets at 6. Every extra year of duration hedges more of the liability, so the optimiser pushes duration to exactly 6.0.
@@ -72,6 +93,7 @@ Outputs go to `output/`:
 | `grid_fine_1pct.csv` | the two best sleeve choices at 1% steps (2 × 5,151 portfolios) |
 | `best_allocation.csv`, `headline_portfolios.csv` | best feasible, best with no rules, best muni-heavy |
 | `credit_projection.csv` | predicted default and recovery rates by year |
+| `expected_return_after_defaults.csv` | best portfolio: yield, expected default loss, net expected return and simulated return, by year |
 | `figures/*.png` | charts (section 6) |
 
 Results are reproducible: random seed 2026, 5,000 paths, 60 monthly steps. All portfolios share the same random draws, so differences between them come from the allocation, not from noise.
@@ -256,6 +278,11 @@ Each month assets earn the portfolio return, then pay $0.5M. The portfolio is re
 ### 7. Funded status path and 2031 distribution
 ![funded](output/figures/07_funded_status.png)
 
+### 8. Expected return per year after expected default losses
+![expected return](output/figures/08_expected_return_after_defaults.png)
+- **Left:** a waterfall from each sleeve's contribution to the portfolio yield, minus the 5-year average default loss.
+- **Right:** yield minus that year's expected default loss (bars), next to the simulated total return for that year (dots, with 5th-95th percentile whiskers).
+
 ---
 
 ## 7. Limitations and next steps
@@ -274,5 +301,5 @@ Each month assets earn the portfolio return, then pay $0.5M. The portfolio is re
 | File | Purpose |
 |---|---|
 | `monte_carlo_allocation.py` | Whole model: data loading, Moody's parsing, regime and recovery fits, simulation, allocation grid |
-| `visualize.py` | Runs the model and draws figures 1-7 |
+| `visualize.py` | Runs the model and draws figures 1-8 |
 | `output/` | CSV results, run log, figures |
