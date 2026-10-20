@@ -4,7 +4,9 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 from matplotlib.colors import LinearSegmentedColormap, TwoSlopeNorm
+from matplotlib.ticker import FuncFormatter, NullFormatter
 
 from . import config as C
 from .data import UST
@@ -26,7 +28,7 @@ plt.rcParams.update({
 
 
 def _label(ax, x, y, text, dx=4, dy=0, **kw):
-    ax.annotate(text, (x, y), textcoords="offset points", xytext=(dx, dy), fontsize=8,
+    ax.annotate(text, (x, y), textcoords="offset points", xytext=(dx, dy), fontsize=kw.pop("fontsize", 8),
                 color=kw.pop("color", INK2), va=kw.pop("va", "center"), **kw)
 
 
@@ -40,28 +42,50 @@ def _mix(row, keys):
     return " / ".join(f"{row[k]:.0%} {C.SLEEVES[k]['name'].split(' (')[0]}" for k in keys if row[k] > 1e-9)
 
 
-def market(d):
-    fig, ax = plt.subplots(1, 3, figsize=(15, 4.2))
-    for i, c, lab in ((0, BLUE, f"{d.index[0]:%b %Y}"), (-1, ORANGE, f"{d.index[-1]:%b %Y} (pricing date)")):
-        ax[0].plot(C.TENORS, d[UST].iloc[i], color=c, marker="o", ms=5, label=lab)
-    for t in (1, 10, 30):
-        _label(ax[0], t, d[f"UST{t}"].iloc[-1], f"{d[f'UST{t}'].iloc[-1]:.2f}%", dx=0, dy=8, ha="center")
-    ax[0].set(title="Treasury curve: one year of bear steepening", xlabel="Maturity (years)", ylabel="Yield (%)")
-    ax[0].legend(loc="lower right")
-    for col, c in (("UST2", BLUE), ("UST10", ORANGE), ("UST30", AQUA)):
-        ax[1].plot(d.index, d[col], color=c, lw=1.6, label=col[3:] + "y")
-    ax[1].set(title="Treasury yields, past year", ylabel="Yield (%)")
-    ax[1].legend(loc="upper left")
-    for col, c, lab, dy in (("CORP", BLUE, "IG Corp (C0A0)", -6), ("TEL15", ORANGE, "15+yr Telecom (C8R0)", 0),
-                            ("MUNI", AQUA, "Muni (U0A0)", 6)):
+def market(d, mkt):
+    fig, ax = plt.subplots(2, 2, figsize=(15, 9))
+    a = ax[0, 0]
+    date = d.index[-1]
+    for lag, c in ((5, MUTED), (1, BLUE), (0, ORANGE)):
+        row = d[UST].loc[:date - pd.DateOffset(years=lag)].iloc[-1]
+        lab = f"{row.name:%b %Y}" + (" (pricing date)" if lag == 0 else "")
+        a.plot(C.TENORS, row, color=c, marker="o", ms=4, label=lab)
+    for t, dx, dy in (("3m", 6, -10), ("2", 0, 8), ("10", 0, 8), ("30", 0, 8)):
+        v = d[f"UST{t}"].iloc[-1]
+        _label(a, C.TENORS[C.TENOR_LABELS.index(t)], v, f"{v:.2f}%", dx=dx, dy=dy, ha="center" if dx == 0 else "left")
+    a.set(title="Treasury curve, 1m to 30y", xlabel="Maturity (years)", ylabel="Yield (%)")
+    a.legend(loc="lower right")
+
+    a = ax[0, 1]
+    for col, lab, c in (("UST3m", "3m", MUTED), ("UST2", "2y", BLUE), ("UST10", "10y", ORANGE), ("UST30", "30y", AQUA)):
+        a.plot(d.index, d[col], color=c, lw=1.2, label=lab)
+    for pk in C.NBER_PEAKS:
+        p = pd.Period(pk, "M")
+        a.axvspan(p.to_timestamp(), (p + 12).to_timestamp(), color=RED, alpha=0.10, lw=0)
+    a.set(title="Treasury yields 2006-2026 (shaded: the 12 months after each NBER peak)", ylabel="Yield (%)")
+    a.legend(loc="upper center", ncol=4, fontsize=8)
+
+    a = ax[1, 0]
+    for col, c, lab in (("CORP", BLUE, "IG Corp (C0A0)"), ("HY", RED, "High Yield (H0A0)"),
+                        ("TEL15", ORANGE, "15+yr Telecom (C8R0)"), ("MUNI", AQUA, "Muni (U0A0)")):
         s = d[col] / d[col].iloc[0] * 100
-        ax[2].plot(d.index, s, color=c, lw=1.6, label=lab)
-        _label(ax[2], d.index[-1], s.iloc[-1], f"{lab.split(' (')[0]} {s.iloc[-1] - 100:+.1f}%", dy=dy)
-    ax[2].axhline(100, color=MUTED, lw=0.8)
-    ax[2].set(title="ICE BofA total-return indices (start = 100)", ylabel="Index level")
-    ax[2].legend(loc="lower left")
-    for a in ax[1:]:
-        a.tick_params(axis="x", rotation=30)
+        a.plot(d.index, s, color=c, lw=1.3, label=lab)
+        _label(a, d.index[-1], s.iloc[-1], f"{s.iloc[-1]:.0f}", dx=4)
+    a.axhline(100, color=MUTED, lw=0.8)
+    a.set(title="ICE BofA total-return indices (Oct 2006 = 100)", ylabel="Index level")
+    a.legend(loc="upper left", fontsize=8)
+
+    a = ax[1, 1]
+    x = np.arange(len(C.TENORS))
+    for i, (pk, c) in enumerate(zip(C.NBER_PEAKS, (MUTED, RAMP[2]))):
+        a.bar(x + (i - 1) * 0.27, mkt["stress_moves"][i] * 1e4, width=0.27, color=c, label=f"{pk} peak + 12 months")
+    a.bar(x + 0.27, mkt["stress_drift"] * 1e4, width=0.27, color=BLUE, label="model stress drift (average)")
+    for xi, v in zip(x, mkt["stress_drift"] * 1e4):
+        _label(a, xi + 0.27, v, f"{v:.0f}", dx=0, dy=-8, ha="center")
+    a.axhline(0, color=INK2, lw=0.8)
+    a.set_xticks(x, C.TENOR_LABELS)
+    a.set(title="Stress-year Treasury drift, calibrated on the two recessions", xlabel="Tenor", ylabel="bp over 12 months")
+    a.legend(loc="lower right", fontsize=8)
     _save(fig, "01_market_data.png")
 
 
@@ -107,6 +131,8 @@ def projection(proj, cr):
         ax[1].plot(yrs, proj[r] * 100, color=c, marker="o", ms=5, label=r)
         _label(ax[1], yrs.iloc[-1], proj[r].iloc[-1] * 100, f"{proj[r].iloc[-1] * 100:.2f}%", dx=6)
     ax[1].set_yscale("log")
+    ax[1].yaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{v:g}%"))
+    ax[1].yaxis.set_minor_formatter(NullFormatter())
     ax[1].set_xlim(yrs.iloc[0] - 0.3, yrs.iloc[-1] + 0.7)
     ax[1].set(title="Predicted annual default rate by rating", ylabel="% per year (log)")
     ax[1].legend(loc="lower left", bbox_to_anchor=(0.02, 0.22), ncol=3)
@@ -144,14 +170,16 @@ def heatmap(grid, best):
     _save(fig, "04_sharpe_heatmap.png")
 
 
-def frontier(grid, bench, best, unc):
-    fig, ax = plt.subplots(figsize=(9, 5.6))
+def frontier(grid, sector, bench, best, best_s, unc):
+    fig, ax = plt.subplots(figsize=(9.5, 6))
     pts = ((bench, MUTED, 0.35, "30y Treasury sleeve (rules ignored)"),
-           (grid[~grid.feasible], RAMP[1], 0.5, "2y Treasury sleeve, breaks a rule"),
-           (grid[grid.feasible], BLUE, 0.9, "meets gov cap + duration rule"))
+           (grid[~grid.feasible], RAMP[1], 0.5, "C0A0 corporate sleeve, breaks a rule"),
+           (sector[sector.feasible], YELLOW, 0.6, "tower corporate sleeve, meets rules"),
+           (grid[grid.feasible], BLUE, 0.9, "C0A0 corporate sleeve, meets rules"))
     for df, c, a, lab in pts:
         ax.scatter(df.surplus_vol_ann * 100, df.surplus_ret_ann * 100, s=9, color=c, alpha=a, lw=0, label=lab)
-    for row, keys, lab, c, dy in ((best, C.MAIN, "best feasible", ORANGE, -24), (unc, C.BENCH, "best ignoring rules", AQUA, 10)):
+    for row, keys, lab, c, dy in ((best, C.MAIN, "best feasible", ORANGE, -24), (best_s, C.SECTOR, "best, tower sleeve", RED, -50),
+                                  (unc, C.BENCH, "best ignoring rules", AQUA, 10)):
         ax.scatter(row.surplus_vol_ann * 100, row.surplus_ret_ann * 100, s=150, marker="*", color=c, edgecolor=INK,
                    lw=0.6, zorder=4, label=lab)
         _label(ax, row.surplus_vol_ann * 100, row.surplus_ret_ann * 100, f"{lab}: {_mix(row, keys)}\nSharpe "
@@ -276,3 +304,119 @@ def curve_views(views):
     ax[1].set(title="Chosen portfolio's funded status in Oct 2031 under each view (5th-95th pct)",
               xlabel="Funded status (%)")
     _save(fig, "09_curve_views.png")
+
+
+def index_history(idx):
+    """ICE BofA sub-indices by rating and by maturity, 2006-2026."""
+    groups = (("rating", ["CORP_AAA", "CORP_AA", "CORP_A", "CORP_BBB", "HY"], ["AAA", "AA", "A", "BBB", "HY"]),
+              ("maturity", ["CORP_1_3", "CORP_3_5", "CORP_5_7", "CORP_7_10", "CORP_10P"],
+               ["1-3y", "3-5y", "5-7y", "7-10y", "10y+"]))
+    fig, ax = plt.subplots(1, 2, figsize=(15, 4.8))
+    for a, (title, cols, labs) in zip(ax, groups):
+        x = np.arange(len(cols))
+        r, v, dd = idx.loc[cols, "ann_return"] * 100, idx.loc[cols, "ann_vol"] * 100, idx.loc[cols, "max_drawdown"] * 100
+        a.bar(x - 0.2, r, width=0.38, color=BLUE, label="annualised total return")
+        a.bar(x + 0.2, dd, width=0.38, color=RED, alpha=0.75, label="maximum drawdown")
+        for xi, ri, vi, di in zip(x, r, v, dd):
+            _label(a, xi - 0.2, ri, f"{ri:.1f}%\nvol {vi:.1f}%", dx=0, dy=12, ha="center")
+            _label(a, xi + 0.2, di, f"{di:.0f}%", dx=0, dy=-8, ha="center")
+        a.axhline(0, color=INK2, lw=0.8)
+        a.set_xticks(x, labs)
+        a.set_ylim(dd.min() * 1.25, r.max() * 2.6)
+        a.grid(axis="x", visible=False)
+        a.set(title=f"ICE BofA US corporate sub-indices by {title}, 2006-2026", ylabel="%")
+        a.legend(loc="upper left", fontsize=8)
+    _save(fig, "10_index_history.png")
+
+
+def tower(tab, tw, spreads, mkt):
+    """Bond-level data: yield vs duration on the pricing date, and the tower sleeve's OAS history."""
+    fig, ax = plt.subplots(1, 2, figsize=(15, 5.2), gridspec_kw={"width_ratios": [1.1, 1]})
+    a = ax[0]
+    a.plot(mkt["ust_dur"], mkt["y0"] * 100, color=INK2, marker="o", ms=3, lw=1.2, label="Treasury curve (by duration)")
+    has = tab.dropna(subset=["ytw", "mod_dur"]).astype({"usd_consistent": bool})
+    groups = ((has.tower_sleeve, BLUE, "o", "tower sleeve (American Tower, Crown Castle)"),
+              (has.usd_consistent & ~has.tower_sleeve, ORANGE, "s", "other USD bonds (not in sleeve)"),
+              (~has.usd_consistent, MUTED, "x", "fails USD check (excluded)"))
+    for mask, c, mk, lab in groups:
+        g = has[mask]
+        a.scatter(g.mod_dur, g.ytw * 100, color=c, marker=mk, s=45, zorder=3, label=lab)
+    for b, r in has[has.usd_consistent & ~has.tower_sleeve].iterrows():
+        left = r.mod_dur < 3.5
+        _label(a, r.mod_dur, r.ytw * 100, b, dx=-7 if left else 7, ha="right" if left else "left", fontsize=7)
+    a.scatter(tw["mod_dur"], tw["yield0"] * 100, s=170, marker="*", color=YELLOW, edgecolor=INK, lw=0.6, zorder=4,
+              label=f"sleeve: duration {tw['mod_dur']:.2f}, YTW {tw['yield0']:.2%}")
+    a.set(title="Bond-level yields to worst on the pricing date", xlabel="Modified duration (years)", ylabel="Yield (%)")
+    a.legend(loc="upper left", fontsize=8)
+
+    a = ax[1]
+    o = tw["oas_series"] * 1e4
+    a.plot(o.index, o, color=BLUE, lw=1.4, label="tower sleeve: average OAS")
+    cdx = spreads["IG"].loc[o.index[0]:o.index[-1]] * 1e4
+    a.plot(cdx.index, cdx, color=ORANGE, lw=1.4, label="CDX IG 5y")
+    _label(a, o.index[-1], o.iloc[-1], f"{o.iloc[-1]:.0f} bp", dx=4)
+    _label(a, cdx.index[-1], cdx.iloc[-1], f"{cdx.iloc[-1]:.0f} bp", dx=4)
+    a.set(title=f"Tower sleeve OAS vs CDX IG (spread volatility {tw['spread_vol'] * 1e4:.0f} bp/yr)", ylabel="bp")
+    a.legend(loc="upper right", fontsize=8)
+    a.tick_params(axis="x", rotation=30)
+    _save(fig, "11_tower_bonds.png")
+
+
+def market_pricing(d, mkt, path, be, fc, implied):
+    """What the market prices: policy path, forward curve for Oct 2031, inflation, CDX-implied defaults."""
+    from .market import forward_par
+    fig, ax = plt.subplots(2, 2, figsize=(15, 9))
+    a = ax[0, 0]
+    ff = path[path.instrument.str.startswith("FF")]
+    sfr = path[path.instrument.str.startswith("SFR")]
+    a.plot(ff.months_ahead, ff.rate_pct, color=BLUE, marker="o", ms=5, label="fed funds futures")
+    a.plot(sfr.months_ahead, sfr.rate_pct, color=ORANGE, marker="s", ms=5, label="3m SOFR futures")
+    top = path.rate_pct.iloc[0]
+    a.axhspan(top - 0.25, top, color=MUTED, alpha=0.2, lw=0, label=f"target range today {top - 0.25:.2f}-{top:.2f}%")
+    for r in path.itertuples():
+        if r.instrument.split()[0] in ("FF1", "FF12", "SFR8"):
+            _label(a, r.months_ahead, r.rate_pct, f"{r.rate_pct:.2f}%", dx=0, dy=9, ha="center")
+    a.set(title="Market-implied policy path", xlabel="Months ahead (approx.)", ylabel="%")
+    a.legend(loc="lower right", fontsize=8)
+
+    a = ax[0, 1]
+    lens = np.array([0.5, 1, 2, 3, 5, 7, 10, 20])
+    fwd = [forward_par(mkt["y0"], 5, L) * 100 for L in lens]
+    a.plot(C.TENORS, mkt["y0"] * 100, color=BLUE, marker="o", ms=4, label=f"today ({mkt['date']:%d %b %Y})")
+    a.plot(lens, fwd, color=ORANGE, marker="o", ms=4, label="priced for Oct 2031 (5y forward par yields)")
+    for t, v in zip(lens, fwd):
+        if t in (2, 10):
+            _label(a, t, v, f"{v:.2f}%", dx=0, dy=9, ha="center")
+    for t in ("2", "10"):
+        v = mkt["y0"][C.TENOR_LABELS.index(t)] * 100
+        _label(a, float(t), v, f"{v:.2f}%", dx=0, dy=-10, ha="center")
+    a.set(title="Treasury par curve: today vs priced for October 2031", xlabel="Maturity (years)", ylabel="%")
+    a.legend(loc="lower right", fontsize=8)
+
+    a = ax[1, 0]
+    m = d.resample("ME").last()
+    a.plot(m.index, m["CPI_YOY"], color=INK2, lw=1.3, label="CPI inflation, y/y")
+    a.plot(m.index, m["UST5"] - m["TIPS5"], color=BLUE, lw=1.3, label="5y breakeven")
+    a.plot(m.index, m["UST10"] - m["TIPS10"], color=ORANGE, lw=1.3, label="10y breakeven")
+    a.axhline(2, color=MUTED, lw=0.8)
+    _label(a, m.index[-1], be["5y5y"], f"5y5y {be['5y5y']:.2f}%", dx=4)
+    a.set(title="Inflation vs what TIPS price", ylabel="%")
+    a.legend(loc="upper left", fontsize=8)
+
+    a = ax[1, 1]
+    x = np.arange(len(implied))
+    a.bar(x - 0.2, implied.implied_default * 100, width=0.38, color=RED, alpha=0.8, label="CDX-implied (risk-neutral)")
+    a.bar(x + 0.2, implied.model_default * 100, width=0.38, color=BLUE, label="model, 2027-31 average (real-world)")
+    for xi, r in zip(x, implied.itertuples()):
+        _label(a, xi - 0.2, r.implied_default * 100, f"{r.implied_default:.2%}", dx=0, dy=8, ha="center")
+        _label(a, xi + 0.2, r.model_default * 100, f"{r.model_default:.2%}", dx=0, dy=8, ha="center")
+    a.set_yscale("log")
+    a.yaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{v:g}%"))
+    a.yaxis.set_minor_formatter(NullFormatter())
+    a.set_ylim(top=implied.implied_default.max() * 100 * 4)
+    a.set_xticks(x, [f"Investment grade (CDX IG)\nimplied / model = {implied.ratio.iloc[0]:.1f}x",
+                     f"High yield (CDX HY) vs spec-grade\nimplied / model = {implied.ratio.iloc[1]:.1f}x"])
+    a.grid(axis="x", visible=False)
+    a.set(title="Default rates: priced by CDS vs the model's forecast", ylabel="% per year (log)")
+    a.legend(loc="upper left", fontsize=8)
+    _save(fig, "12_market_pricing.png")

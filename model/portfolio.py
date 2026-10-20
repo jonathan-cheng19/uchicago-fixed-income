@@ -15,7 +15,9 @@ def sleeve_yield(key, y0):
 
 def sleeve_duration(key, y0):
     s = C.SLEEVES[key]
-    return float(par_bond_risk(y0[T_IDX[s["tenor"]]], s["tenor"])[0]) if "tenor" in s else s["mod_dur"]
+    if "mod_dur" in s:                                   # Bloomberg (Treasuries), bond data or ASSUMED (indices)
+        return s["mod_dur"]
+    return float(par_bond_risk(y0[T_IDX[s["tenor"]]], s["tenor"])[0])
 
 
 def simplex(step):

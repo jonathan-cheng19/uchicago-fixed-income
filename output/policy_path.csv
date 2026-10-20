@@ -1,0 +1,13 @@
+instrument,months_ahead,rate_pct
+Fed funds target (upper bound),0,4.0
+"FF1 (fed funds, month 1)",0,3.882499695
+"FF2 (fed funds, month 2)",1,3.925003052
+"FF3 (fed funds, month 3)",2,4.080001831
+"FF4 (fed funds, month 4)",3,4.154998779
+"FF6 (fed funds, month 6)",5,4.334999084
+"FF12 (fed funds, month 12)",11,4.644996643
+"SFR1 (3m SOFR, quarter 1)",0,3.942497253
+"SFR2 (3m SOFR, quarter 2)",3,4.25
+"SFR3 (3m SOFR, quarter 3)",6,4.519996643
+"SFR4 (3m SOFR, quarter 4)",9,4.669998169
+"SFR8 (3m SOFR, quarter 8)",21,4.665000916

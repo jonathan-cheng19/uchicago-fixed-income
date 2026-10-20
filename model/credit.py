@@ -47,9 +47,12 @@ def fit_credit(dr, rec):
                 rec_r2=1 - resid.var() / rec.var(), sg_benign=cond.loc["SG", "benign"])
 
 
-def stress_prob(y0):
-    """NY Fed / Estrella-Mishkin probit on the 10y - 3m spread; the 1y bill stands in for 3m."""
-    term = (y0[list(C.TENORS).index(10)] - y0[0]) * 100
+def stress_prob(d):
+    """NY Fed / Estrella-Mishkin probit: P(recession within 12 months) = Phi(-0.5333 - 0.6330 x spread),
+    spread = 10y - 3m Treasury in percentage points, averaged over the last month (the NY Fed uses
+    monthly averages)."""
+    s = (d["UST10"] - d["UST3m"]).loc[d.index[-1] - pd.DateOffset(months=1):]
+    term = float(s.mean())
     return float(norm.cdf(-0.5333 - 0.6330 * term)), term
 
 

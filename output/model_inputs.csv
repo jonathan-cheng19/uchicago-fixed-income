@@ -1,0 +1,57 @@
+input,value,source
+Pricing date,2026-10-19,Data: Bloomberg
+Treasury 1m yield,3.990%,Data: Bloomberg USGG generic
+Treasury 3m yield,4.171%,Data: Bloomberg USGG generic
+Treasury 6m yield,4.357%,Data: Bloomberg USGG generic
+Treasury 1 yield,4.465%,Data: Bloomberg USGG generic
+Treasury 2 yield,4.772%,Data: Bloomberg USGG generic
+Treasury 3 yield,4.863%,Data: Bloomberg USGG generic
+Treasury 5 yield,4.940%,Data: Bloomberg USGG generic
+Treasury 7 yield,5.037%,Data: Bloomberg USGG generic
+Treasury 10 yield,5.140%,Data: Bloomberg USGG generic
+Treasury 20 yield,5.519%,Data: Bloomberg USGG generic
+Treasury 30 yield,5.467%,Data: Bloomberg USGG generic
+Treasury 1m modified duration,0.082,Computed: par-bond formula
+Treasury 3m modified duration,0.247,Data: Bloomberg
+Treasury 6m modified duration,0.488,Data: Bloomberg
+Treasury 1 modified duration,0.967,Computed: par-bond formula
+Treasury 2 modified duration,1.886,Data: Bloomberg
+Treasury 3 modified duration,2.760,Data: Bloomberg
+Treasury 5 modified duration,4.383,Data: Bloomberg
+Treasury 7 modified duration,5.837,Data: Bloomberg
+Treasury 10 modified duration,7.742,Data: Bloomberg
+Treasury 20 modified duration,12.015,Data: Bloomberg
+Treasury 30 modified duration,14.659,Data: Bloomberg
+Curve covariance window,2021-10-19 to 2026-10-19 (261 weekly changes),Estimated
+10y-3m spread (1-month average),1.049 pp,Data: Bloomberg
+P(credit-stress year) 2027,11.6%,Estimated: NY Fed probit
+"P(benign -> stress), P(stress -> benign)","0.133, 0.170",Estimated: HMM on Moody's
+Recovery model,"0.5877 -3.0264 x SG default rate, resid sd 0.082",Estimated: Moody's Exh. 26 vs 36
+Stress-year Treasury drift 1m,-201 bp,"Estimated: NBER recessions 2007-08, 2020"
+Stress-year Treasury drift 3m,-220 bp,"Estimated: NBER recessions 2007-08, 2020"
+Stress-year Treasury drift 6m,-212 bp,"Estimated: NBER recessions 2007-08, 2020"
+Stress-year Treasury drift 1,-192 bp,Interpolated between observed tenors
+Stress-year Treasury drift 2,-153 bp,"Estimated: NBER recessions 2007-08, 2020"
+Stress-year Treasury drift 3,-133 bp,"Estimated: NBER recessions 2007-08, 2020"
+Stress-year Treasury drift 5,-105 bp,"Estimated: NBER recessions 2007-08, 2020"
+Stress-year Treasury drift 7,-94 bp,Interpolated between observed tenors
+Stress-year Treasury drift 10,-78 bp,"Estimated: NBER recessions 2007-08, 2020"
+Stress-year Treasury drift 20,-71 bp,Interpolated between observed tenors
+Stress-year Treasury drift 30,-65 bp,"Estimated: NBER recessions 2007-08, 2020"
+IG Corporate (C0A0): yield,5.988%,ASSUMED
+IG Corporate (C0A0): modified duration,6.60,ASSUMED
+IG Corporate (C0A0): rate beta (empirical / mod. duration),0.934,Estimated
+IG Corporate (C0A0): spread_beta,0.200,ASSUMED
+Municipal (U0A0): yield,3.867%,ASSUMED
+Municipal (U0A0): modified duration,6.20,ASSUMED
+Municipal (U0A0): rate beta (empirical / mod. duration),0.735,Estimated
+Municipal (U0A0): spread_beta,0.060,ASSUMED
+Baa Tower Corporate: yield,5.824%,Data: bond-level PDFs
+Baa Tower Corporate: modified duration,4.44,Data: bond-level PDFs
+Baa Tower Corporate: rate beta (empirical / mod. duration),1.000,Estimated
+Baa Tower Corporate: spread_beta,0.197,Estimated: IG assumption x DTS ratio
+"Tower sleeve: bonds, average OAS","7 bonds, 113.5 bp",Data: bond-level PDFs
+Tower sleeve: spread volatility (monthly OAS changes),34.4 bp/yr,Estimated
+"DTS check: relative spread vol, tower OAS vs CDX IG",0.28 vs 0.33,Estimated
+CDX IG / HY 5y spread,62.7 / 351.2 bp,Data / Estimated (HY from price)
+IG spread sensitivity cross-check (CDX beta x Moody's Exh. 12),0.145 (assumed 0.20),Estimated

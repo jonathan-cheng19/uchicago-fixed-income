@@ -36,8 +36,8 @@ def simulate(mkt, cr, p_stress0, rng, tilt=None):
     DR = {r: cr["dr"][r].values[yrs] for r in cr["dr"]}
     RR = np.clip(cr["rec_a"] + cr["rec_b"] * DR["SG"] + cr["rec_sd"] * rng.standard_normal((N, Y5)), 0.05, 0.95)
 
-    # Treasury curve: empirical covariance, stress-year rally demeaned across paths (no net view)
-    stress_m = np.repeat(reg, 12, axis=1)[..., None] * (C.STRESS_DRIFT / 12)
+    # Treasury curve: empirical covariance, stress-year rally (NBER-calibrated) demeaned across paths
+    stress_m = np.repeat(reg, 12, axis=1)[..., None] * (mkt["stress_drift"] / 12)
     drift = stress_m - stress_m.mean(axis=0)
     if tilt is not None:
         drift = drift + tilt / M
@@ -80,4 +80,4 @@ def simulate(mkt, cr, p_stress0, rng, tilt=None):
         z = Z[:, t, k[:n]] * (1 - wk[:n]) + Z[:, t, k[:n] + 1] * wk[:n]
         L[:, t] = pay * np.exp(-z * tau[:n]).sum(axis=1)
 
-    return dict(R=R, L=L, RL=(L[:, 1:] + pay) / L[:, :-1] - 1, reg=reg, DR=DR, RR=RR, loss=loss, y0=mkt["y0"])
+    return dict(R=R, L=L, RL=(L[:, 1:] + pay) / L[:, :-1] - 1, reg=reg, DR=DR, RR=RR, loss=loss, y0=mkt["y0"], Y=Y)
